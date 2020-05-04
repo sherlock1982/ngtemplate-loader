@@ -9,7 +9,6 @@ module.exports = function (content) {
     var ngModule = getAndInterpolateOption.call(this, 'module', 'ng'); // ng is the global angular module that does not need to explicitly required
     var relativeTo = getAndInterpolateOption.call(this, 'relativeTo', '');
     var prefix = getAndInterpolateOption.call(this, 'prefix', '');
-    var requireAngular = !!options.requireAngular || false;
     var absolute = false;
     var pathSep = options.pathSep || '/';
     var resource = this.resource;
@@ -43,21 +42,12 @@ module.exports = function (content) {
         .filter(Boolean)
         .join(pathSep)
         .replace(new RegExp(escapeRegExp(pathSep) + '+', 'g'), pathSep);
-    var html;
 
-    if (content.match(/^module\.exports/)) {
-        var firstQuote = findQuote(content, false);
-        var secondQuote = findQuote(content, true);
-        html = content.substr(firstQuote, secondQuote - firstQuote + 1);
-    } else {
-        html = content;
-    }
-
-    return "var path = '"+jsesc(filePath)+"';\n" +
-        "var html = " + html + ";\n" +
-        (requireAngular ? "var angular = require('angular');\n" : "window.") +
-        "angular.module('" + ngModule + "').run(['$templateCache', function(c) { c.put(path, html) }]);\n" +
-        "module.exports = path;";
+    return content.replace(/export default code;/, '') +
+        "import * as angular from 'angular';\n" +
+        "const path = '"+jsesc(filePath)+"';\n" +
+        "angular.module('" + ngModule + "').run(['$templateCache', c => c.put(path, code)]);\n" +
+        "export default path;";
 
     function getAndInterpolateOption(optionKey, def) {
         return options[optionKey]
@@ -69,19 +59,8 @@ module.exports = function (content) {
             : def
     }
 
-    function findQuote(content, backwards) {
-        var i = backwards ? content.length - 1 : 0;
-        while (i >= 0 && i < content.length) {
-            if (content[i] === '"' || content[i] === "'") {
-                return i;
-            }
-            i += backwards ? -1 : 1;
-        }
-        return -1;
-    }
-
     // source: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions#Using_Special_Characters
     function escapeRegExp(string) {
-        return string.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1");
+        return string.replace(/([.*+?^=!:${}()|[\]/\\])/g, "\\$1");
     }
 };
